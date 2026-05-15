@@ -245,7 +245,7 @@ At any instant, only one converter per channel carries the audio signal; the com
 
 > **Note on scalability:** R=150Ω base supports future parallel module configurations: 2 modules parallel → effective R=75Ω (add 600Ω); 4 modules → R=37.5Ω (add 1200Ω). Native resistor progression: 150, 300, 600, 1200Ω — all standard E96 values.
 
-> **Note on parts availability** 5/15/26 on JLCPCB site, 100 ohm and 200 ohm R available, parts are 0.02% / 10PPM/C / 0805 package; PTFR0805Q100RN9 and PTFR0805Q200RN9.  It was found that 0.01% parts were not available or prohibitive cost: $8 to $65 per part.  This is probably why Soekris started with 0.05% and there was discussion about going to 0.02% and a goal of 0.01% but I don't know if it was ever resolved.
+> **Note on parts availability** 5/15/26 on JLCPCB site, 100 ohm and 200 ohm R available, parts are 0.02% / 10PPM/C / 0805 package; PTFR0805Q100RN9 and PTFR0805Q200RN9.  It was found that 0.01% parts were not available or prohibitive cost: $8 to $65 per part.  This is probably why Soekris started with 0.05% and there was discussion about going to 0.02% and a goal of 0.01% but I don't know if it was ever resolved.  In addition, these parts are available at Mouser: 708-RNCF0603TKW100R and 708-RNCF0603TKW200R 100 ohms / 200 ohms which are 0.01%, 2ppm, 0603 package, and $1.76 each in volume of 100.  
 
 ### 7.4 Reference Voltage
 
