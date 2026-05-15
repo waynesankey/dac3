@@ -1,5 +1,5 @@
-# Testbed R-2R DAC — System Architecture Specification
-**Revision:** 1.0  
+# Testbed R-2R DAC/Streamer — System Architecture Specification
+**Revision:** 1.1  
 **Date:** 2026-05-15  
 **Author:** Wayne  
 **Status:** Draft
@@ -8,11 +8,13 @@
 
 ## 1. Purpose and Scope
 
-This document defines the architecture and design requirements for a stereo R-2R ladder DAC testbed. The primary goals are:
+This document defines the architecture and design requirements for a stereo R-2R ladder DAC/Streamer testbed. The primary goals are:
 
 1. Validate the sign-magnitude R-2R converter architecture as a proof of concept — "can we get good sound out of this?"
 2. Serve as a learning platform for digital audio processing in an FPGA
 3. Produce a finished, usable product suitable as a gift (Ward) with RPi4 and Volumio
+
+**Note on device character:** integrating an RPi4 as the primary I2S source (running Volumio) means this is properly a *network streamer with an integrated R-2R DAC*, not a standalone DAC. The RPi also hosts a UART control link to the FPGA and a web interface for real-time DAC parameter control and diagnostics — capabilities that reinforce the streamer framing.
 
 This testbed intentionally uses a simplified converter architecture (74HC595 shift registers, single resistor per bit) compared to the intended final product (discrete MOSFET switches, PMV16XN, separated gate/Vref domains). The testbed validates the signal chain and digital processing; the final product implements the full MSB-style architecture with all identified improvements.
 
@@ -22,7 +24,7 @@ This testbed intentionally uses a simplified converter architecture (74HC595 shi
 
 ### 2.1 Architecture Summary
 
-The DAC accepts digital audio via three input paths, processes it entirely in an FPGA, and drives four R-2R converter modules in a sign-magnitude balanced topology. All analog processing is passive. The system is self-contained with an internal power supply.
+The device accepts digital audio via two input paths (RPi4 I2S and S/PDIF coax), processes it entirely in an FPGA, and drives four R-2R converter modules in a sign-magnitude single-ended topology. A UART link between the integrated RPi4 and the FPGA provides real-time parameter control and diagnostics via a web interface hosted on the RPi. All analog processing is passive, and it makes sense to include an output buffer and balanced converter from the Soekris design. The system is self-contained with an internal power supply.
 
 ### 2.2 Block Diagram
 
@@ -33,7 +35,7 @@ See attached block diagram (testbed_dac_block_diagram_v2).
 | Decision | Choice | Rationale |
 |---|---|---|
 | FPGA platform | Digilent Cmod A7-35T | $99, Artix-7, 48-pin DIP, onboard SRAM, USB programming |
-| Converter resolution | 16-bit (15-bit magnitude + sign) | Matches CD quality; adequate for architecture validation |
+| Converter resolution | 17-bit (16-bit magnitude + sign) | Exceeds CD quality by 1 bit with high def sources; adequate for architecture validation |
 | Converter switch | 74HC595 shift register | Simple, available, sufficient for testbed |
 | Reference voltage | ±2.5V | Standard audio level, compatible with R=150Ω ladder |
 | Ladder R value | 150Ω | Low enough for adequate output level; scalable (300/600/1200Ω future) |
@@ -41,6 +43,7 @@ See attached block diagram (testbed_dac_block_diagram_v2).
 | Output filter | Passive 2nd order RC | No active components in signal path; DC coupled |
 | Output coupling | DC direct | No capacitor in signal path; relies on mute relay for protection |
 | Clock architecture | Dual oscillator + FIFO | Complete clock domain isolation; OCXO owns the sample clock |
+| FPGA control link | UART (RPi ↔ FPGA) | Real-time parameter control and diagnostics; RPi hosts web UI |
 
 ---
 
@@ -48,7 +51,7 @@ See attached block diagram (testbed_dac_block_diagram_v2).
 
 ### 3.1 Input Sources
 
-Three input paths share a common downstream processing chain after the input mux:
+Two input paths share a common downstream processing chain after the input mux:
 
 **Path 1 — RPi4 I2S (primary)**
 - Interface: 3-wire I2S (BCLK, LRCLK, DATA) via header connector
@@ -63,15 +66,12 @@ Three input paths share a common downstream processing chain after the input mux
 - Decoded entirely in FPGA — no receiver IC
 - Compatible with Logitech Transporter coax output
 
-**Path 3 — Toslink Optical (secondary)**
-- Standard Toslink receiver module, 3.3V TTL output direct to FPGA
-- No additional buffer required
 
 ### 3.2 Input Selection
 
 Software-controlled mux in FPGA selects active input. Default: RPi4 I2S.
 
-### 3.3 S/PDIF Decoder (FPGA, Paths 2 & 3)
+### 3.3 S/PDIF Decoder (FPGA, Path 2)
 
 Implemented entirely in SystemVerilog, approximately 150 lines:
 
@@ -109,11 +109,8 @@ Single logic gate (74LVC1G157 or equivalent) selects active oscillator based on 
 
 ### 4.4 FPGA PLL (MMCM/PLLE2)
 
-Artix-7 PLLE2 multiplies selected oscillator to 196.608 MHz fabric clock:
-- 45.1584 MHz × 4.354... — NOTE: requires verification; non-integer ratio may need MMCM fractional mode or alternative multiply/divide
-- 49.152 MHz × 4 = 196.608 MHz — clean integer ratio ✓
+Artix-7 PLLE2 multiplies selected oscillator 4x to 196.608 MHz fabric clock for 48kHz family and 180.6336MHz for 44.1kHz family.
 
-> **Action item:** Verify 44.1kHz family PLL configuration. Alternative: run fabric at 180.6336 MHz (45.1584 × 4) for 44.1kHz family.
 
 ### 4.5 Clock Output (Logitech Transporter)
 
@@ -202,6 +199,7 @@ Applied immediately before truncation:
 
 ### 6.6 Zero Crossing Detection and Converter Routing
 
+Note - not sure any of this is needed:
 - Monitors sign bit each sample
 - On sign change: sequence idle converter pair to zero before activating; active pair latches zeros
 - Manages handoff to prevent glitch at crossover
@@ -246,6 +244,8 @@ At any instant, only one converter per channel carries the audio signal; the com
 - Resistor count per module: 31 (15× R + 16× 2R)
 
 > **Note on scalability:** R=150Ω base supports future parallel module configurations: 2 modules parallel → effective R=75Ω (add 600Ω); 4 modules → R=37.5Ω (add 1200Ω). Native resistor progression: 150, 300, 600, 1200Ω — all standard E96 values.
+
+> **Note on parts availability** 5/15/26 on JLCPCB site, 100 ohm and 200 ohm R available, parts are 0.02% / 10PPM/C / 0805 package; PTFR0805Q100RN9 and PTFR0805Q200RN9.  It was found that 0.01% parts were not available or prohibitive cost: $8 to $65 per part.  This is probably why Soekris started with 0.05% and there was discussion about going to 0.02% and a goal of 0.01% but I don't know if it was ever resolved.
 
 ### 7.4 Reference Voltage
 
@@ -298,6 +298,10 @@ One relay per channel, shorts output to AGND:
 - Type: RCA phono jack, one per channel
 - Coupling: DC direct (no output capacitor)
 - Load: 4P1L tube preamplifier, filament input (~50kΩ–several hundred kΩ — no loading concern)
+
+### 8.4 Output Options
+
+- Populate output buffer and balanced converter from the Soekris design as a solder-in option.
 
 ---
 
@@ -381,7 +385,9 @@ Artix-7 35T is very comfortably sized for this application.
 | Mute relay control | 2 | One per channel |
 | Status LED | 1 | Power/lock indicator |
 | Clock out enable (optional) | 1 | BNC clock output control |
-| **Total** | **~19** | **25 pins remaining** |
+| UART TX (FPGA → RPi) | 1 | Control link — 3.3V direct, compatible with RPi GPIO |
+| UART RX (RPi → FPGA) | 1 | Control link |
+| **Total** | **~21** | **23 pins remaining** |
 
 ---
 
@@ -403,7 +409,42 @@ Artix-7 35T is very comfortably sized for this application.
 
 - OS: Raspberry Pi OS
 - Player: Volumio (configured for bit-perfect I2S output)
-- Interface: web browser from phone/tablet (no display required)
+- Control interface: lightweight Flask web server running alongside Volumio on a separate port (e.g. :8080); accessible from phone/tablet browser
+- No display required on the unit
+
+### 13.4 UART Control Link (RPi ↔ FPGA)
+
+Physical layer:
+- RPi UART: GPIO 14 (TX) / GPIO 15 (RX) — `/dev/ttyAMA0` with Bluetooth disabled, or `/dev/ttyS0`
+- FPGA I/O: 3.3V LVCMOS — direct connection, no level shifting required (both 3.3V)
+- Baud rate: 115200 8N1
+
+Protocol (ASCII line-oriented, CR/LF terminated):
+- RPi → FPGA: command strings, e.g. `SET INPUT 0`, `SET MUTE ON`, `SET DITHER ON`, `GET STATUS`
+- FPGA → RPi: ACK/NAK per command, plus unsolicited periodic status packet containing FIFO fill %, detected sample rate, lock status, error counters
+
+FPGA implementation:
+- Standard UART RX/TX module in SystemVerilog (~100 lines)
+- Small command parser and status reporter
+- Controllable parameters: input source select, mute, dither enable/disable, future: oversampling ratio override
+- Diagnostic readbacks: FIFO fill level, sample rate detected, S/PDIF lock, BCLK presence
+
+### 13.5 Web Control Interface
+
+Hosted on RPi4, served by Flask (Python). Communicates with the FPGA by writing to `/dev/ttyAMA0`.
+
+Controls exposed:
+- Input source select (RPi I2S / S/PDIF coax)
+- Mute toggle
+- Dither enable
+- Status display: detected sample rate, FIFO health bar, lock indicator, uptime
+
+Diagnostics panel:
+- Real-time FIFO fill level (polls FPGA via UART every ~1s)
+- Error counter display (FIFO underrun/overrun, S/PDIF lock loss events)
+- FPGA firmware version readback
+
+UI: single responsive HTML page, minimal JavaScript (no framework). Runs alongside Volumio without conflict.
 
 ---
 
@@ -426,6 +467,11 @@ Artix-7 35T is very comfortably sized for this application.
 | 13 | Write and simulate SystemVerilog: full processing chain | Medium |
 | 14 | Evaluate shrouded connector variant for production quality | Low |
 | 15 | Investigate Logitech Transporter clock input frequency requirement | Low |
+| 16 | Confirm RPi UART port to use (ttyAMA0 vs ttyS0) — disable BT if needed | High |
+| 17 | Write and simulate SystemVerilog: UART RX/TX module and command parser | Medium |
+| 18 | Define UART command set and status packet format | Medium |
+| 19 | Write RPi Flask web control server and HTML UI | Medium |
+| 20 | Test UART link end-to-end: RPi ↔ FPGA command/response | Medium |
 
 ---
 
@@ -446,4 +492,4 @@ The following are noted here for continuity but are NOT in scope for this testbe
 
 ---
 
-*End of document — Rev 1.0*
+*End of document — Rev 1.1*
