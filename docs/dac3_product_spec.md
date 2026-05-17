@@ -247,7 +247,30 @@ At any instant, only one converter per channel carries the audio signal; the com
 
 > **Note on parts availability** 5/15/26 on JLCPCB site, 100 ohm and 200 ohm R available, parts are 0.02% / 10PPM/C / 0805 package; PTFR0805Q100RN9 and PTFR0805Q200RN9.  It was found that 0.01% parts were not available or prohibitive cost: $8 to $65 per part.  This is probably why Soekris started with 0.05% and there was discussion about going to 0.02% and a goal of 0.01% but I don't know if it was ever resolved.  In addition, these parts are available at Mouser: 708-RNCF0603TKW100R and 708-RNCF0603TKW200R 100 ohms / 200 ohms which are 0.01%, 2ppm, 0603 package, and $1.76 each in volume of 100.  
 
-### 7.4 Reference Voltage
+### 7.4 R-2R Ladder Leg Trim (Invention — Wayne)
+
+In a standard R-2R ladder DAC using discrete MOSFET switches, switch Ron adds in series with each 2R rung, making the effective rung impedance 2R+Ron instead of 2R. This breaks the exact 2:1 ratio required for linearity-free operation, producing a gain error of Ron/(2R+Ron). This is a pure gain error — INL and DNL are unaffected because all switches carry identical current regardless of code.
+
+**The invention:** Add a trim resistor of value Ron/2 in series with each ladder leg (the horizontal R resistors). The rungs are left unchanged.
+
+**Proof of exact correction:**
+- Rungs: 2R + Ron (unchanged)
+- Legs: R + Ron/2 (trimmed)
+- Ratio: (2R + Ron) / (R + Ron/2) = 2(R + Ron/2) / (R + Ron/2) = **exactly 2**
+
+The correction is algebraically exact for any value of Ron. Trim resistors need only 1% tolerance because they are correcting a systematic deterministic error, not a random matching error.
+
+**Partial trim:** Trimming only the upper N bits (e.g. top 8 of 16) captures essentially all the benefit. The absolute voltage error on lower bits scales with their bit weight and falls below the noise floor rapidly — component count and layout complexity in the lower ladder section can be reduced without meaningful performance penalty.
+
+**Simulation confirmed:** MSB transition discontinuity present without trim, completely eliminated with trim. INL/DNL flat to numerical noise floor in both cases.
+
+**Applicability:** This correction applies specifically to the final product architecture using discrete MOSFET switches (PMV16XN). The testbed uses 74HC595 shift registers which have no discrete switch Ron in this sense; the trim is not required here but the principle is validated by simulation and ready to apply to the final product PCB.
+
+**Status:** Independently invented by Wayne during DAC3 design. Not previously encountered in published R-2R DAC literature.
+
+---
+
+### 7.5 Reference Voltage
 
 - Positive: +2.5V from LT3042 LDO (0.8 nV/√Hz)
 - Negative: −2.5V from LT3094 LDO (2 nV/√Hz)
@@ -257,7 +280,7 @@ At any instant, only one converter per channel carries the audio signal; the com
 
 > **Critical architectural note:** 74HC595 VCC is powered from the **digital supply**, NOT from Vref. This separates the digital switching domain from the Vref domain. This is the same architectural separation that gives MSB its performance advantage over Denafrips (which powers 74LV595 from Vref, injecting ~400mA switching transients onto the reference).
 
-### 7.5 Module Connectors
+### 7.6 Module Connectors
 
 **Status: TBD — connector selection deferred pending further research.**
 
@@ -366,7 +389,7 @@ JLCPCB minimum order is 5 units — 1 converter module spare, 4 motherboards spa
 
 ### 10.2 Module Orientation
 
-Converter modules mount edge-on (vertical) into motherboard, consistent with MSB Cascade physical arrangement. Final connector orientation (right-angle on module, vertical socket on motherboard, or edge connector) to be confirmed once connector type is selected — see §7.5.
+Converter modules mount edge-on (vertical) into motherboard, consistent with MSB Cascade physical arrangement. Final connector orientation (right-angle on module, vertical socket on motherboard, or edge connector) to be confirmed once connector type is selected — see §7.6.
 
 ### 10.3 Mechanical Retention
 
