@@ -361,6 +361,46 @@ Standard R-2R DAC implementations (Denafrips, Soekris) apply no asymmetry correc
 
 **Status:** Independently invented by Wayne during DAC3/final product architecture design.
 
+### 7.8 Per-Bit +/− Converter Matching Calibration (Invention — Wayne)
+
+#### Background
+
+In a sign-magnitude R-2R DAC, the positive and negative half-cycles are produced by physically separate converter sections — the + converter and the − converter — each with their own ladder resistors and switches. Resistor matching errors between corresponding bit positions in the + and − converters produce asymmetric bit weights, which manifest as even-order harmonic distortion across the full transfer function. The output-referred Kelvin calibration (§7.7) corrects full-scale asymmetry but does not address per-bit matching errors.
+
+#### The Invention
+
+Using the same difference amplifier infrastructure defined for the Vref asymmetry calibration, each bit position is individually matched between the + and − converters using a one-hot measurement and binary search nulling procedure.
+
+#### Calibration Procedure
+
+For each bit N from MSB downward to the measurement floor:
+
+1. Assert bit N only (one-hot) on both the + and − converters simultaneously — all other bits zero on both sides
+2. The difference amplifier measures the difference in output contribution between the + and − converters for that bit
+3. Binary search on the code of one converter side, adjusting until the difference amplifier output is nulled to zero
+4. Store the code delta required for null as the correction coefficient for bit N
+5. During playback, apply the stored correction coefficients to remap output codes in real time
+
+#### Stopping Criterion
+
+The procedure is applied from the MSB downward and stops when the bit weight contribution to the output approaches the reliable resolution floor of the difference amplifier. With an OPA2188 (5µV max input offset) and a 2.5V full-scale reference, the op-amp can reliably resolve differences down to approximately 2ppm of full scale. The RNCF0603TKY499R resistors at 0.01% tolerance represent 100ppm matching error — giving approximately 50× margin between the resistor error and the op-amp floor across most of the bit range. Below the point where the correction step size approaches the op-amp floor, the resistors are already more accurate than the measurement instrument, and applying a correction would inject noise rather than remove error. The algorithm detects this condition and stops.
+
+#### What Is Being Corrected
+
+This calibration does not measure each bit against an absolute reference. It measures the + and − converter contributions **relative to each other** and makes them equal. The result is that corresponding bit weights in the + and − converters are matched to the resolution of the op-amp, which is far better than resistor matching alone (50× in this implementation). Even-order harmonic distortion — which arises from asymmetry between positive and negative half-cycles — is suppressed across the full transfer function, not just at full scale.
+
+#### Hardware Cost
+
+Zero additional hardware beyond what is already defined for the output-referred Kelvin calibration (§7.7). The OPA2188 difference amplifier and the FPGA binary search algorithm are shared between both calibration procedures. The per-bit calibration is an additional boot-time routine using the same infrastructure.
+
+#### Relation to Prior Art
+
+High-end measurement DACs achieve similar results through laser trimming of resistors at production time — a one-time factory calibration that cannot track temperature or aging. This approach performs the equivalent correction dynamically in firmware at every power-up, automatically tracking any drift. Denafrips and Soekris implement no equivalent correction. MSB Technology's public narrative focuses exclusively on parts selection and binning with no mention of post-calibration, suggesting they rely on component precision rather than dynamic correction — making this approach architecturally distinct.
+
+**Applicability:** Final product architecture (discrete MOSFET switches). Dependent on and uses the same difference amplifier infrastructure as §7.7.
+
+**Status:** Independently invented by Wayne during DAC3/final product architecture design.
+
 ---
 
 ## 8. Analog Output Section
