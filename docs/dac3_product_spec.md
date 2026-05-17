@@ -259,11 +259,28 @@ At any instant, only one converter per channel carries the audio signal; the com
 
 ### 7.5 Module Connectors
 
-- Connector: Würth Elektronik WR-PHD 2.54mm, 12-pin 2-row
+**Status: TBD — connector selection deferred pending further research.**
+
+The connector choice is more consequential than it first appears: if the prototype motherboard is designed from the outset as a **testbench for final product converter modules**, then the connector fitted here becomes the de-facto standard for the final product. Changing it later means redesigning both the motherboard and every converter module. This warrants choosing carefully rather than defaulting to a convenience header.
+
+Design intent:
+- Backplane plugin style (module plugs vertically into motherboard), not discrete pin headers
+- MSB Technology's Cascade architecture uses a similar physical arrangement — high-density edge or board-to-board connector with good mechanical retention and low contact resistance; exact part to be identified from product photos and teardown references
+- Two connectors per module (one near each end) for mechanical stability, matching MSB physical layout
+- Gold contacts preferred for audio-grade reliability
+- Connector must be available through standard distributors (LCSC, Mouser, DigiKey) in small quantities
+
+Candidate families to evaluate:
+- Samtec high-density board-to-board (e.g. LSHM, QSE/QTE series)
+- TE Connectivity ERNI or DIN 41612 Eurocard-style (if pitch and depth suit the module height)
+- Custom edge connector (if MSB approach is confirmed to be gold-finger style)
+
+Fallback (simple pin header, adequate for testbed-only use):
+- Würth Elektronik WR-PHD 2.54mm, 12-pin 2-row
   - Module (right-angle pin header): 61301221021 — $0.96
   - Motherboard (vertical socket): 61301221821 — $0.97
-- Two connectors per module (one near each end) — matches MSB Cascade physical arrangement
-- Mechanical spreader bar between modules recommended for connector stability
+
+**Action required:** Research MSB connector type from available photos/teardowns before committing to PCB footprint. See open items.
 
 ---
 
@@ -349,7 +366,7 @@ JLCPCB minimum order is 5 units — 1 converter module spare, 4 motherboards spa
 
 ### 10.2 Module Orientation
 
-Converter modules mount edge-on (vertical) into motherboard, consistent with MSB Cascade physical arrangement. Right-angle connectors on modules, vertical sockets on motherboard.
+Converter modules mount edge-on (vertical) into motherboard, consistent with MSB Cascade physical arrangement. Final connector orientation (right-angle on module, vertical socket on motherboard, or edge connector) to be confirmed once connector type is selected — see §7.5.
 
 ### 10.3 Mechanical Retention
 
@@ -465,7 +482,7 @@ UI: single responsive HTML page, minimal JavaScript (no framework). Runs alongsi
 | 11 | Write and simulate SystemVerilog: async FIFO controller | Medium |
 | 12 | Generate FIR coefficients and verify frequency response | Medium |
 | 13 | Write and simulate SystemVerilog: full processing chain | Medium |
-| 14 | Evaluate shrouded connector variant for production quality | Low |
+| 14 | Identify MSB Cascade module connector from photos/teardowns; evaluate backplane-style alternatives (Samtec, DIN 41612, edge connector) — decision gates PCB layout | High |
 | 15 | Investigate Logitech Transporter clock input frequency requirement | Low |
 | 16 | Confirm RPi UART port to use (ttyAMA0 vs ttyS0) — disable BT if needed | High |
 | 17 | Write and simulate SystemVerilog: UART RX/TX module and command parser | Medium |
