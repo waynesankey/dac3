@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>R-2R Ron Analysis</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #0e1117;
+    color: #e0e6f0;
+    font-family: 'Courier New', monospace;
+    padding: 20px;
+    min-height: 100vh;
+  }
+  h1 { font-size: 14px; letter-spacing: 3px; text-transform: uppercase; color: #4af0a0; margin-bottom: 4px; }
+  .subtitle { font-size: 11px; color: #8899aa; letter-spacing: 1px; margin-bottom: 16px; }
+  .model-box {
+    background: #12181f; border: 1px solid #2a3a50; border-radius: 6px;
+    padding: 11px 14px; margin-bottom: 14px; font-size: 11px; color: #aabbcc; line-height: 1.9;
+  }
+  .model-box b { color: #4af0a0; }
+  .model-box .hi { color: #f0a04a; }
+  .controls {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;
+    margin-bottom: 16px; background: #161b25; border: 1px solid #2a3040;
+    border-radius: 6px; padding: 14px;
+  }
+  .ctrl { display: flex; flex-direction: column; gap: 4px; }
+  label { font-size: 10px; color: #aabbcc; letter-spacing: 1.5px; text-transform: uppercase; }
+  .val { font-size: 13px; color: #4af0a0; font-weight: bold; min-height: 18px; }
+  input[type=range] { width: 100%; accent-color: #4af0a0; cursor: pointer; }
+  .charts2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+  .chart-box { background: #161b25; border: 1px solid #2a3040; border-radius: 6px; padding: 12px; }
+  .chart-title { font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: #aabbcc; margin-bottom: 8px; }
+  canvas { display: block; width: 100%; }
+  .stats {
+    display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px;
+    background: #161b25; border: 1px solid #2a3040; border-radius: 6px; padding: 12px;
+    margin-bottom: 12px;
+  }
+  .stat { display: flex; flex-direction: column; gap: 2px; }
+  .stat-label { font-size: 9px; color: #aabbcc; letter-spacing: 1px; text-transform: uppercase; }
+  .stat-val { font-size: 13px; color: #4af0a0; font-weight: bold; }
+  .stat-val.warn { color: #f0a04a; }
+  .legend { display: flex; gap: 16px; margin-bottom: 6px; flex-wrap: wrap; }
+  .leg { display: flex; align-items: center; gap: 5px; font-size: 10px; color: #aabbcc; }
+  .leg-dot { width: 20px; height: 2px; border-radius: 1px; }
+  .full-chart { background: #161b25; border: 1px solid #2a3040; border-radius: 6px; padding: 12px; margin-bottom: 12px; }
+  .note { font-size: 11px; color: #b0c8b0; line-height: 1.7; background: #0d1a12; border: 1px solid #1a3a22; border-radius: 4px; padding: 12px; }
+</style>
+</head>
+<body>
+
+<h1>R-2R Ladder · Ron Analysis</h1>
+<div class="subtitle">8-bit DC sweep · RNCF0603TKY499R · Ron/2 trim adds series resistance to legs only</div>
+
+<div class="model-box">
+  <b>Untrimmed:</b>&nbsp; legs = R &nbsp;|&nbsp; rungs = 2R+Ron &nbsp;→&nbsp; ratio = (2R+Ron)/R = 2+Ron/R &nbsp;<span class="hi">≠ 2 → gain error, no linearity error</span><br>
+  <b>Trimmed:&nbsp;&nbsp;</b>&nbsp; legs = R+Ron/2 &nbsp;|&nbsp; rungs = 2R+Ron (unchanged) &nbsp;→&nbsp; ratio = (2R+Ron)/(R+Ron/2) = <b>exactly 2 ✓</b><br>
+  <b>Trim resistors</b> (Ron/2 each, added in series with every leg) need only 1% tolerance — they correct a systematic error, not a precision one.
+</div>
+
+<div class="controls">
+  <div class="ctrl">
+    <label>Ladder R (Ω)</label>
+    <div class="val" id="vR">499</div>
+    <input type="range" id="sR" min="50" max="1000" step="1" value="499">
+  </div>
+  <div class="ctrl">
+    <label>Ron (Ω)</label>
+    <div class="val" id="vRon">18</div>
+    <input type="range" id="sRon" min="0" max="80" step="1" value="18">
+  </div>
+  <div class="ctrl">
+    <label>Vref (V)</label>
+    <div class="val" id="vVref">2.50</div>
+    <input type="range" id="sVref" min="1" max="5" step="0.1" value="2.5">
+  </div>
+  <div class="ctrl">
+    <label>Trim Enable</label>
+    <div class="val" id="vTrim">OFF</div>
+    <input type="range" id="sTrim" min="0" max="1" step="1" value="0">
+  </div>
+</div>
+
+<div class="full-chart">
+  <div class="chart-title">Transfer Function — Vout vs Code</div>
+  <div class="legend">
+    <div class="leg"><div class="leg-dot" style="background:#3a5070"></div>Ideal (Ron=0)</div>
+    <div class="leg"><div class="leg-dot" style="background:#4af0a0" id="legActualDot"></div><span id="legActualLabel">Actual (legs=R)</span></div>
+  </div>
+  <canvas id="cTransfer" height="170"></canvas>
+</div>
+
+<div class="charts2">
+  <div class="chart-box">
+    <div class="chart-title">Gain Error vs Ron — split scale</div>
+    <div class="legend">
+      <div class="leg"><div class="leg-dot" style="background:#4af0a0"></div>Untrimmed (top)</div>
+      <div class="leg"><div class="leg-dot" style="background:#f0a04a"></div>Trimmed residual (bottom)</div>
+      <div class="leg"><div class="leg-dot" style="background:#cc4466"></div>Current Ron</div>
+    </div>
+    <canvas id="cGain" height="220"></canvas>
+  </div>
+  <div class="chart-box">
+    <div class="chart-title">INL &amp; DNL (LSB) — actual</div>
+    <div class="legend">
+      <div class="leg"><div class="leg-dot" style="background:#4af0a0"></div>INL</div>
+      <div class="leg"><div class="leg-dot" style="background:#7080f0"></div>DNL</div>
+    </div>
+    <canvas id="cErrors" height="160"></canvas>
+  </div>
+</div>
+
+<div class="stats">
+  <div class="stat"><div class="stat-label">Gain Error</div><div class="stat-val warn" id="sGain">—</div></div>
+  <div class="stat"><div class="stat-label">Gain (trimmed)</div><div class="stat-val" id="sGainT">—</div></div>
+  <div class="stat"><div class="stat-label">Max |INL|</div><div class="stat-val" id="sINL">—</div></div>
+  <div class="stat"><div class="stat-label">Max |DNL|</div><div class="stat-val" id="sDNL">—</div></div>
+  <div class="stat"><div class="stat-label">Trim R = Ron/2</div><div class="stat-val" id="sRtrim">—</div></div>
+</div>
+
+<div class="note" id="verdict"></div>
+
+<script>
+const BITS = 8;
+const N = 1 << BITS;
+
+// Thevenin reduction LSB→MSB.
+// Rleg   = horizontal ladder leg resistor (R untrimmed, R+Ron/2 trimmed)
+// Rshunt = rung impedance = 2R + Ron  (always — rungs never change)
+function sim(Rleg, Rshunt, Vref) {
+  const out = new Float64Array(N);
+  for (let code = 0; code < N; code++) {
+    let vth = 0, rth = 0;
+    for (let bit = 0; bit < BITS; bit++) {
+      const vsrc = ((code >> bit) & 1) ? Vref : 0;
+      if (bit === 0) {
+        vth = vsrc; rth = Rshunt;
+      } else {
+        rth += Rleg;
+        const rpar = (rth * Rshunt) / (rth + Rshunt);
+        vth = (vth / rth + vsrc / Rshunt) * rpar;
+        rth = rpar;
+      }
+    }
+    out[code] = vth;
+  }
+  return out;
+}
+
+function gainError(R, Ron) {
+  // Gain error = Ron / (2R + Ron) as a fraction
+  // Derivation: untrimmed gain = Vout_fs / Vout_ideal_fs
+  // At full scale all bits=1: Thevenin gives Vout = Vref * R/(2R+Ron) * correction...
+  // Simpler: just simulate code=255 for both and ratio
+  const Rshunt = 2*R + Ron;
+  const ideal  = sim(R, 2*R, 1.0);      // Ron=0
+  const actual = sim(R, Rshunt, 1.0);   // with Ron, untrimmed
+  const trimm  = sim(R + Ron/2, Rshunt, 1.0); // trimmed
+  return {
+    untrimmed: (actual[N-1]/ideal[N-1] - 1) * 100,
+    trimmed:   (trimm[N-1]/ideal[N-1]  - 1) * 100
+  };
+}
+
+function computeErrors(actual, ideal) {
+  const lsb  = ideal[N-1] / (N-1);
+  const gain = actual[N-1] / ideal[N-1];
+  const inl  = new Float64Array(N);
+  const dnl  = new Float64Array(N);
+  for (let i = 0; i < N; i++) inl[i] = (actual[i] - i * lsb * gain) / lsb;
+  for (let i = 1; i < N; i++) dnl[i] = (actual[i] - actual[i-1]) / lsb - 1.0;
+  return { inl, dnl, gain };
+}
+
+function setupCanvas(id) {
+  const c = document.getElementById(id);
+  c.width = c.parentElement.clientWidth - 24;
+  return c;
+}
+
+const PAD = { l: 50, r: 12, t: 8, b: 24 };
+
+function drawTransfer(canvas, ideal, active) {
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+  const pw = W - PAD.l - PAD.r, ph = H - PAD.t - PAD.b;
+  const maxV = ideal[N-1] * 1.08;
+  const px = i => PAD.l + (i/(N-1)) * pw;
+  const py = v => PAD.t + ph - (v/maxV) * ph;
+
+  ctx.strokeStyle = '#1a2030'; ctx.lineWidth = 1;
+  for (let i = 0; i <= 4; i++) {
+    const y = PAD.t + ph*i/4;
+    ctx.beginPath(); ctx.moveTo(PAD.l,y); ctx.lineTo(PAD.l+pw,y); ctx.stroke();
+    ctx.fillStyle='#99aabb'; ctx.font='9px Courier New'; ctx.textAlign='right';
+    ctx.fillText((maxV*(1-i/4)).toFixed(2)+'V', PAD.l-3, y+3);
+  }
+  ctx.fillStyle='#99aabb'; ctx.textAlign='center';
+  [0,64,128,192,255].forEach(c => ctx.fillText(c, px(c), H-6));
+
+  function line(data, color, w, dash=[]) {
+    ctx.strokeStyle=color; ctx.lineWidth=w; ctx.setLineDash(dash);
+    ctx.beginPath(); ctx.moveTo(px(0),py(data[0]));
+    for (let i=1;i<N;i++) ctx.lineTo(px(i),py(data[i]));
+    ctx.stroke(); ctx.setLineDash([]);
+  }
+  line(ideal,  '#3a5070', 1.5, [4,3]);
+  line(active, '#4af0a0', 2);
+}
+
+function drawGainVsRon(canvas, R, Ron) {
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+
+  // Split canvas into top half (untrimmed) and bottom half (trimmed) with a divider
+  const divY = Math.floor(H / 2) - 4;
+  const topH  = divY - 2;
+  const botH  = H - divY - 18; // leave room for shared X labels at very bottom
+  const LPAD = PAD.l, RPAD = PAD.r;
+  const pw = W - LPAD - RPAD;
+
+  const maxRon = 80;
+  const steps  = 160;
+  const untrArr = [], trimArr = [];
+  for (let i = 0; i <= steps; i++) {
+    const r = i / steps * maxRon;
+    const e = gainError(R, r);
+    untrArr.push(e.untrimmed);   // always negative (gain < ideal due to Ron voltage drop)
+    trimArr.push(e.trimmed);
+  }
+
+  const pxR = i => LPAD + (i / steps) * pw;
+
+  // ── TOP PANEL: untrimmed gain error ──────────────────────────────────────
+  const topPad = { t: 6, b: 4 };
+  const tph = topH - topPad.t - topPad.b;
+  const maxUntr = Math.max(...untrArr.map(Math.abs)) * 1.15;
+
+  const pyTop = v => topPad.t + tph - (Math.abs(v) / maxUntr) * tph;
+
+  // Panel label
+  ctx.fillStyle = '#778899'; ctx.font = '9px Courier New'; ctx.textAlign = 'left';
+  ctx.fillText('UNTRIMMED gain error (%)', LPAD, topPad.t - 1);
+
+  // Grid
+  ctx.strokeStyle = '#1a2030'; ctx.lineWidth = 1;
+  for (let i = 0; i <= 3; i++) {
+    const y = topPad.t + tph * i / 3;
+    ctx.beginPath(); ctx.moveTo(LPAD, y); ctx.lineTo(LPAD + pw, y); ctx.stroke();
+    ctx.fillStyle = '#99aabb'; ctx.font = '9px Courier New'; ctx.textAlign = 'right';
+    ctx.fillText((maxUntr * (1 - i/3)).toFixed(2) + '%', LPAD - 3, y + 3);
+  }
+
+  // Untrimmed curve (green)
+  ctx.strokeStyle = '#4af0a0'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(pxR(0), pyTop(untrArr[0]));
+  for (let i = 1; i <= steps; i++) ctx.lineTo(pxR(i), pyTop(untrArr[i]));
+  ctx.stroke();
+
+  // Ron cursor
+  const ci = Ron / maxRon * steps;
+  ctx.strokeStyle = '#cc4466'; ctx.lineWidth = 1.5; ctx.setLineDash([3, 3]);
+  ctx.beginPath(); ctx.moveTo(pxR(ci), topPad.t); ctx.lineTo(pxR(ci), topPad.t + tph); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Annotate cursor value
+  const uVal = untrArr[Math.round(ci)];
+  ctx.fillStyle = '#cc4466'; ctx.font = '9px Courier New'; ctx.textAlign = 'left';
+  const labelX = pxR(ci) + 3;
+  ctx.fillText(uVal.toFixed(3) + '%', labelX > W - 60 ? pxR(ci) - 45 : labelX, topPad.t + 12);
+
+  // ── DIVIDER ───────────────────────────────────────────────────────────────
+  ctx.strokeStyle = '#2a3a50'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(LPAD, divY); ctx.lineTo(LPAD + pw, divY); ctx.stroke();
+
+  // ── BOTTOM PANEL: trimmed residual gain error ─────────────────────────────
+  const botTop = divY + 6;
+  const botPad = { t: botTop, b: H - 18 };
+  const bph = botPad.b - botPad.t;
+  const maxTrim = Math.max(...trimArr.map(Math.abs), 0.0001) * 1.5;
+
+  const pyBot = v => botPad.t + bph/2 - (v / maxTrim) * (bph/2);
+
+  ctx.fillStyle = '#778899'; ctx.font = '9px Courier New'; ctx.textAlign = 'left';
+  ctx.fillText('TRIMMED residual error (%) — own scale', LPAD, botTop - 2);
+
+  // Grid (centred on zero)
+  ctx.strokeStyle = '#1a2030'; ctx.lineWidth = 1;
+  [-1, -0.5, 0, 0.5, 1].forEach(f => {
+    const y = botPad.t + bph/2 - f * bph/2;
+    ctx.beginPath(); ctx.moveTo(LPAD, y); ctx.lineTo(LPAD + pw, y); ctx.stroke();
+    ctx.fillStyle = '#99aabb'; ctx.font = '9px Courier New'; ctx.textAlign = 'right';
+    ctx.fillText((f * maxTrim).toExponential(1) + '%', LPAD - 3, y + 3);
+  });
+  // Zero line
+  ctx.strokeStyle = '#2a3a50'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(LPAD, pyBot(0)); ctx.lineTo(LPAD + pw, pyBot(0)); ctx.stroke();
+
+  // Trimmed curve (orange)
+  ctx.strokeStyle = '#f0a04a'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(pxR(0), pyBot(trimArr[0]));
+  for (let i = 1; i <= steps; i++) ctx.lineTo(pxR(i), pyBot(trimArr[i]));
+  ctx.stroke();
+
+  // Ron cursor
+  ctx.strokeStyle = '#cc4466'; ctx.lineWidth = 1.5; ctx.setLineDash([3, 3]);
+  ctx.beginPath(); ctx.moveTo(pxR(ci), botPad.t); ctx.lineTo(pxR(ci), botPad.b); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Annotate cursor value
+  const tVal = trimArr[Math.round(ci)];
+  ctx.fillStyle = '#cc4466'; ctx.font = '9px Courier New'; ctx.textAlign = 'left';
+  ctx.fillText(tVal.toExponential(2) + '%', labelX > W - 60 ? pxR(ci) - 55 : labelX, botPad.t + 12);
+
+  // Shared X axis labels
+  ctx.fillStyle = '#99aabb'; ctx.textAlign = 'center';
+  [0, 20, 40, 60, 80].forEach(v => {
+    ctx.fillText(v + 'Ω', pxR(v / maxRon * steps), H - 4);
+  });
+  ctx.textAlign = 'center'; ctx.fillStyle = '#778899';
+  ctx.fillText('Ron →', LPAD + pw/2, H - 4);
+}
+
+function drawErrors(canvas, inl, dnl) {
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+  const pw = W - PAD.l - PAD.r, ph = H - PAD.t - PAD.b;
+
+  const allV = [...inl,...dnl].filter(isFinite).map(Math.abs);
+  const maxAbs = Math.max(1e-15, ...allV);
+  const exp  = Math.ceil(Math.log10(maxAbs));
+  const raw  = Math.pow(10, exp);
+  const nice = raw >= maxAbs*5 ? raw/5 : raw >= maxAbs*2 ? raw/2 : raw;
+
+  const px = i => PAD.l + (i/(N-1))*pw;
+  const py = v => PAD.t + ph/2 - (v/nice)*(ph/2);
+
+  ctx.strokeStyle='#1a2030'; ctx.lineWidth=1;
+  [-1,-0.5,0,0.5,1].forEach(f => {
+    const y = PAD.t+ph/2-f*ph/2;
+    ctx.beginPath(); ctx.moveTo(PAD.l,y); ctx.lineTo(PAD.l+pw,y); ctx.stroke();
+    ctx.fillStyle='#99aabb'; ctx.font='9px Courier New'; ctx.textAlign='right';
+    ctx.fillText((f*nice).toExponential(1), PAD.l-3, y+3);
+  });
+  ctx.strokeStyle='#2a3a50'; ctx.lineWidth=1.5;
+  ctx.beginPath(); ctx.moveTo(PAD.l,py(0)); ctx.lineTo(PAD.l+pw,py(0)); ctx.stroke();
+  ctx.fillStyle='#99aabb'; ctx.textAlign='center';
+  [0,64,128,192,255].forEach(c => ctx.fillText(c, px(c), H-6));
+
+  function line(data, color) {
+    ctx.strokeStyle=color; ctx.lineWidth=1.5;
+    ctx.beginPath(); let s=false;
+    for (let i=0;i<N;i++) {
+      if(!isFinite(data[i])) continue;
+      s ? ctx.lineTo(px(i),py(data[i])) : (ctx.moveTo(px(i),py(data[i])), s=true);
+    }
+    ctx.stroke();
+  }
+  line(dnl, '#7080f0');
+  line(inl, '#4af0a0');
+}
+
+function run() {
+  const R        = +document.getElementById('sR').value;
+  const Ron      = +document.getElementById('sRon').value;
+  const Vref     = +document.getElementById('sVref').value;
+  const trimOn   = +document.getElementById('sTrim').value === 1;
+
+  document.getElementById('vR').textContent    = R;
+  document.getElementById('vRon').textContent  = Ron;
+  document.getElementById('vVref').textContent = Vref.toFixed(2);
+  document.getElementById('vTrim').textContent = trimOn ? 'ON' : 'OFF';
+
+  // Update transfer function legend dynamically
+  document.getElementById('legActualLabel').textContent = trimOn
+    ? 'Trimmed (legs=R+Ron/2, rungs=2R+Ron)'
+    : 'Actual (legs=R, rungs=2R+Ron)';
+
+  const Rshunt = 2*R + Ron;          // rung impedance — never changes
+  const RlegU  = R;                  // untrimmed leg
+  const RlegT  = R + Ron/2;          // trimmed leg
+
+  const ideal   = sim(R,    2*R,    Vref);   // ideal: Ron=0
+  const actual  = sim(RlegU, Rshunt, Vref);  // untrimmed
+  const trimmed = sim(RlegT, Rshunt, Vref);  // trimmed
+
+  // Active dataset drives transfer + INL/DNL panels
+  const active = trimOn ? trimmed : actual;
+  const eActive = computeErrors(active, ideal);
+  const eT      = computeErrors(trimmed, ideal);  // always needed for stats
+
+  const cT = setupCanvas('cTransfer');
+  const cG = setupCanvas('cGain');
+  const cE = setupCanvas('cErrors');
+
+  drawTransfer(cT, ideal, active);
+  drawGainVsRon(cG, R, Ron);
+  drawErrors(cE, eActive.inl, eActive.dnl);
+
+  const gainErr  = (computeErrors(actual,  ideal).gain - 1) * 100;
+  const gainErrT = (eT.gain - 1) * 100;
+  const eShow    = trimOn ? eT : computeErrors(actual, ideal);
+  const maxINL   = Math.max(...Array.from(eActive.inl).map(Math.abs));
+  const maxDNL   = Math.max(...Array.from(eActive.dnl).slice(1).map(Math.abs));
+  const trimR    = Ron/2;
+
+  document.getElementById('sGain').textContent  = gainErr.toFixed(3) + '%';
+  document.getElementById('sGainT').textContent = gainErrT.toFixed(5) + '%';
+  document.getElementById('sINL').textContent   = maxINL.toExponential(2) + ' LSB';
+  document.getElementById('sDNL').textContent   = maxDNL.toExponential(2) + ' LSB';
+  document.getElementById('sRtrim').textContent = trimR.toFixed(1) + ' Ω';
+
+  const ronPct = (Ron / (2*R+Ron) * 100).toFixed(2);
+  document.getElementById('verdict').innerHTML =
+    `<b>R=${R}Ω, Ron=${Ron}Ω:</b> Ron is ${ronPct}% of rung impedance → gain error ${gainErr.toFixed(3)}% untrimmed. ` +
+    `<b>Active (${trimOn ? 'TRIMMED' : 'UNTRIMMED'}):</b> INL=${maxINL.toExponential(1)} LSB, DNL=${maxDNL.toExponential(1)} LSB — flat to numerical noise. ` +
+    `Ron causes <b>gain error only</b> — zero linearity impact in either case.<br>` +
+    `<b>Trim:</b> add ${trimR.toFixed(1)}Ω (=Ron/2) in series with every ladder leg. ` +
+    `Rungs stay at ${Rshunt.toFixed(0)}Ω. ` +
+    `Leg ratio: ${Rshunt.toFixed(0)}/${RlegT.toFixed(1)} = ${(Rshunt/RlegT).toFixed(6)} (ideal 2.000000). ` +
+    `Residual gain error = ${gainErrT.toFixed(5)}%.`;
+}
+
+['sR','sRon','sVref','sTrim'].forEach(id =>
+  document.getElementById(id).addEventListener('input', run)
+);
+window.addEventListener('resize', run);
+run();
+</script>
+</body>
+</html>

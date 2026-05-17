@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>4-Bit R-2R Ladder DAC</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;600;700&display=swap');
+
+  :root {
+    --bg: #0a0e14;
+    --panel: #111820;
+    --border: #1e2d3d;
+    --wire: #4a9eff;
+    --wire-gnd: #2ecc71;
+    --wire-out: #ff6b35;
+    --wire-ref: #f39c12;
+    --resistor: #c8a96e;
+    --switch: #9b59b6;
+    --node: #ffffff;
+    --label: #a8c0d6;
+    --accent: #4a9eff;
+    --dim: #3a5068;
+    --bit3: #ff6b6b;
+    --bit2: #ffd93d;
+    --bit1: #6bcb77;
+    --bit0: #4d96ff;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--label);
+    font-family: 'Rajdhani', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px 16px;
+  }
+
+  h1 {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 1.1rem;
+    color: var(--accent);
+    letter-spacing: 0.15em;
+    margin-bottom: 4px;
+    text-transform: uppercase;
+  }
+
+  .subtitle {
+    font-size: 0.85rem;
+    color: var(--dim);
+    letter-spacing: 0.08em;
+    margin-bottom: 20px;
+    font-family: 'Share Tech Mono', monospace;
+  }
+
+  .schematic-wrap {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    width: 100%;
+    max-width: 860px;
+  }
+
+  svg text {
+    font-family: 'Share Tech Mono', monospace;
+  }
+
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 16px;
+    padding: 12px 16px;
+    background: #0d1520;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.8rem;
+    color: var(--label);
+    font-family: 'Share Tech Mono', monospace;
+  }
+
+  .legend-swatch {
+    width: 24px;
+    height: 3px;
+    border-radius: 2px;
+  }
+
+  .eq-section {
+    margin-top: 20px;
+    padding: 16px;
+    background: #0d1520;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    max-width: 860px;
+    width: 100%;
+  }
+
+  .eq-section h2 {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.9rem;
+    color: var(--accent);
+    letter-spacing: 0.1em;
+    margin-bottom: 12px;
+    text-transform: uppercase;
+  }
+
+  .eq-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+
+  .eq-box {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 10px 14px;
+  }
+
+  .eq-box .label {
+    font-size: 0.7rem;
+    color: var(--dim);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+    font-family: 'Share Tech Mono', monospace;
+  }
+
+  .eq-box .formula {
+    font-size: 0.95rem;
+    color: #e8f4ff;
+    font-family: 'Share Tech Mono', monospace;
+    line-height: 1.6;
+  }
+
+  .note {
+    margin-top: 16px;
+    font-size: 0.8rem;
+    color: var(--dim);
+    line-height: 1.6;
+    font-family: 'Share Tech Mono', monospace;
+    max-width: 860px;
+    width: 100%;
+    padding: 0 4px;
+  }
+
+  .note span { color: var(--wire-out); }
+</style>
+</head>
+<body>
+
+<h1>R-2R Ladder DAC</h1>
+<div class="subtitle">// 4-BIT EXAMPLE — VOLTAGE MODE OUTPUT //</div>
+
+<div class="schematic-wrap">
+<svg viewBox="0 0 820 420" width="100%" xmlns="http://www.w3.org/2000/svg">
+
+  <!-- ─── GRID REFERENCE (invisible) ──────────────────────────────────── -->
+  <!-- Bit columns: B3=160, B2=300, B1=440, B0=580  -->
+  <!-- Main horizontal rail Y=120 -->
+  <!-- Switch row Y=240 -->
+  <!-- GND rail Y=360 -->
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- VREF label and line -->
+  <line x1="60" y1="120" x2="120" y2="120" stroke="#f39c12" stroke-width="2"/>
+  <text x="24" y="115" fill="#f39c12" font-size="11" font-weight="bold">V</text>
+  <text x="34" y="119" fill="#f39c12" font-size="8">REF</text>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- MAIN HORIZONTAL LADDER RAIL (top) -->
+  <!-- Segments between R resistors -->
+  <!-- Node B3 x=160, Node B2 x=300, Node B1 x=440, Node B0 x=580, Vout tap x=660 -->
+
+  <!-- Segment: VREF entry → Node3 -->
+  <!-- 2R termination resistor at far left (between VREF and Node3) -->
+  <!-- R resistors between nodes -->
+
+  <!-- ── 2R TERMINATION at left (between Vref entry x=120 and node x=160) -->
+  <!-- Resistor symbol: zigzag between x=120,y=120 and x=160,y=120 -->
+  <polyline points="120,120 124,112 128,128 132,112 136,128 140,112 144,128 148,120 160,120"
+            fill="none" stroke="#c8a96e" stroke-width="2.2"/>
+  <text x="126" y="108" fill="#c8a96e" font-size="10">2R</text>
+
+  <!-- ── R resistor: Node3 → Node2 (x=160→x=300, midpoint x=230) -->
+  <line x1="160" y1="120" x2="210" y2="120" stroke="#4a9eff" stroke-width="2"/>
+  <polyline points="210,120 214,112 218,128 222,112 226,128 230,112 234,128 238,120 250,120"
+            fill="none" stroke="#c8a96e" stroke-width="2.2"/>
+  <line x1="250" y1="120" x2="300" y2="120" stroke="#4a9eff" stroke-width="2"/>
+  <text x="222" y="108" fill="#c8a96e" font-size="10">R</text>
+
+  <!-- ── R resistor: Node2 → Node1 (x=300→x=440) -->
+  <line x1="300" y1="120" x2="350" y2="120" stroke="#4a9eff" stroke-width="2"/>
+  <polyline points="350,120 354,112 358,128 362,112 366,128 370,112 374,128 378,120 390,120"
+            fill="none" stroke="#c8a96e" stroke-width="2.2"/>
+  <line x1="390" y1="120" x2="440" y2="120" stroke="#4a9eff" stroke-width="2"/>
+  <text x="362" y="108" fill="#c8a96e" font-size="10">R</text>
+
+  <!-- ── R resistor: Node1 → Node0 (x=440→x=580) -->
+  <line x1="440" y1="120" x2="490" y2="120" stroke="#4a9eff" stroke-width="2"/>
+  <polyline points="490,120 494,112 498,128 502,112 506,128 510,112 514,128 518,120 530,120"
+            fill="none" stroke="#c8a96e" stroke-width="2.2"/>
+  <line x1="530" y1="120" x2="580" y2="120" stroke="#4a9eff" stroke-width="2"/>
+  <text x="502" y="108" fill="#c8a96e" font-size="10">R</text>
+
+  <!-- ── 2R termination at right end (Node0 → output node x=660) -->
+  <!-- Actually just 2R to GND at node0, and Vout taken from node0 side -->
+  <!-- Vout tap line goes right from node0 at x=580 -->
+  <line x1="580" y1="120" x2="660" y2="120" stroke="#ff6b35" stroke-width="2"/>
+  <line x1="660" y1="120" x2="760" y2="120" stroke="#ff6b35" stroke-width="2" stroke-dasharray="4,3"/>
+
+  <!-- Vout label -->
+  <text x="768" y="115" fill="#ff6b35" font-size="11" font-weight="bold">V</text>
+  <text x="778" y="119" fill="#ff6b35" font-size="8">OUT</text>
+
+  <!-- ── 2R to GND shunt at right end node (x=660) -->
+  <line x1="660" y1="120" x2="660" y2="152" stroke="#4a9eff" stroke-width="2"/>
+  <polyline points="660,152 652,156 668,160 652,164 668,168 652,172 668,176 660,180"
+            fill="none" stroke="#c8a96e" stroke-width="2.2"/>
+  <line x1="660" y1="180" x2="660" y2="200" stroke="#2ecc71" stroke-width="2"/>
+  <!-- GND symbol -->
+  <line x1="648" y1="200" x2="672" y2="200" stroke="#2ecc71" stroke-width="2"/>
+  <line x1="652" y1="205" x2="668" y2="205" stroke="#2ecc71" stroke-width="1.5"/>
+  <line x1="656" y1="210" x2="664" y2="210" stroke="#2ecc71" stroke-width="1"/>
+  <text x="648" y="158" fill="#c8a96e" font-size="10">2R</text>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- 2R SHUNT RESISTORS (vertical, node to switch) -->
+  <!-- Each node has a 2R going down to a switch, then to GND or left floating -->
+
+  <!-- Bit 3 (MSB) — node x=160 -->
+  <line x1="160" y1="120" x2="160" y2="152" stroke="#ff6b6b" stroke-width="2"/>
+  <polyline points="160,152 152,156 168,160 152,164 168,168 152,172 168,176 160,180"
+            fill="none" stroke="#c8a96e" stroke-width="2.2"/>
+  <line x1="160" y1="180" x2="160" y2="205" stroke="#ff6b6b" stroke-width="2"/>
+  <text x="148" y="158" fill="#c8a96e" font-size="10">2R</text>
+
+  <!-- Bit 2 — node x=300 -->
+  <line x1="300" y1="120" x2="300" y2="152" stroke="#ffd93d" stroke-width="2"/>
+  <polyline points="300,152 292,156 308,160 292,164 308,168 292,172 308,176 300,180"
+            fill="none" stroke="#c8a96e" stroke-width="2.2"/>
+  <line x1="300" y1="180" x2="300" y2="205" stroke="#ffd93d" stroke-width="2"/>
+  <text x="288" y="158" fill="#c8a96e" font-size="10">2R</text>
+
+  <!-- Bit 1 — node x=440 -->
+  <line x1="440" y1="120" x2="440" y2="152" stroke="#6bcb77" stroke-width="2"/>
+  <polyline points="440,152 432,156 448,160 432,164 448,168 432,172 448,176 440,180"
+            fill="none" stroke="#c8a96e" stroke-width="2.2"/>
+  <line x1="440" y1="180" x2="440" y2="205" stroke="#6bcb77" stroke-width="2"/>
+  <text x="428" y="158" fill="#c8a96e" font-size="10">2R</text>
+
+  <!-- Bit 0 (LSB) — node x=580 -->
+  <line x1="580" y1="120" x2="580" y2="152" stroke="#4d96ff" stroke-width="2"/>
+  <polyline points="580,152 572,156 588,160 572,164 588,168 572,172 588,176 580,180"
+            fill="none" stroke="#c8a96e" stroke-width="2.2"/>
+  <line x1="580" y1="180" x2="580" y2="205" stroke="#4d96ff" stroke-width="2"/>
+  <text x="568" y="158" fill="#c8a96e" font-size="10">2R</text>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- SWITCHES — SPDT symbol (connects to VREF or GND) -->
+  <!-- Switch at x=160 -->
+
+  <!-- Bit3 switch -->
+  <circle cx="160" cy="215" r="5" fill="none" stroke="#9b59b6" stroke-width="1.8"/>
+  <!-- switch arm (shown in '1' position = up toward VREF line coming from left) -->
+  <!-- pivot at 215, arm goes up-left to VREF bus or down to GND -->
+  <!-- We'll show two terminals: top=VREF side, bottom=GND, arm selects -->
+  <!-- VREF terminal line going left -->
+  <line x1="140" y1="228" x2="155" y2="218" stroke="#f39c12" stroke-width="1.5" stroke-dasharray="3,2"/>
+  <text x="100" y="233" fill="#f39c12" font-size="9">V</text><text x="107" y="236" fill="#f39c12" font-size="7">REF</text>
+  <!-- GND terminal line going further down -->
+  <line x1="160" y1="220" x2="160" y2="245" stroke="#2ecc71" stroke-width="1.5" stroke-dasharray="3,2"/>
+  <!-- Switch arm in '1' position -->
+  <line x1="160" y1="210" x2="148" y2="224" stroke="#9b59b6" stroke-width="2"/>
+  <text x="143" y="210" fill="#ff6b6b" font-size="11" font-weight="bold">D3</text>
+  <text x="141" y="222" fill="#9b59b6" font-size="9">SW</text>
+
+  <!-- GND below switch -->
+  <line x1="160" y1="245" x2="160" y2="265" stroke="#2ecc71" stroke-width="1.5"/>
+
+  <!-- Bit2 switch -->
+  <circle cx="300" cy="215" r="5" fill="none" stroke="#9b59b6" stroke-width="1.8"/>
+  <line x1="280" y1="228" x2="295" y2="218" stroke="#f39c12" stroke-width="1.5" stroke-dasharray="3,2"/>
+  <text x="240" y="233" fill="#f39c12" font-size="9">V</text><text x="247" y="236" fill="#f39c12" font-size="7">REF</text>
+  <line x1="300" y1="220" x2="300" y2="245" stroke="#2ecc71" stroke-width="1.5" stroke-dasharray="3,2"/>
+  <line x1="300" y1="210" x2="288" y2="224" stroke="#9b59b6" stroke-width="2"/>
+  <text x="283" y="210" fill="#ffd93d" font-size="11" font-weight="bold">D2</text>
+  <text x="281" y="222" fill="#9b59b6" font-size="9">SW</text>
+  <line x1="300" y1="245" x2="300" y2="265" stroke="#2ecc71" stroke-width="1.5"/>
+
+  <!-- Bit1 switch -->
+  <circle cx="440" cy="215" r="5" fill="none" stroke="#9b59b6" stroke-width="1.8"/>
+  <line x1="420" y1="228" x2="435" y2="218" stroke="#f39c12" stroke-width="1.5" stroke-dasharray="3,2"/>
+  <text x="380" y="233" fill="#f39c12" font-size="9">V</text><text x="387" y="236" fill="#f39c12" font-size="7">REF</text>
+  <line x1="440" y1="220" x2="440" y2="245" stroke="#2ecc71" stroke-width="1.5" stroke-dasharray="3,2"/>
+  <line x1="440" y1="210" x2="428" y2="224" stroke="#9b59b6" stroke-width="2"/>
+  <text x="423" y="210" fill="#6bcb77" font-size="11" font-weight="bold">D1</text>
+  <text x="421" y="222" fill="#9b59b6" font-size="9">SW</text>
+  <line x1="440" y1="245" x2="440" y2="265" stroke="#2ecc71" stroke-width="1.5"/>
+
+  <!-- Bit0 switch -->
+  <circle cx="580" cy="215" r="5" fill="none" stroke="#9b59b6" stroke-width="1.8"/>
+  <line x1="560" y1="228" x2="575" y2="218" stroke="#f39c12" stroke-width="1.5" stroke-dasharray="3,2"/>
+  <text x="520" y="233" fill="#f39c12" font-size="9">V</text><text x="527" y="236" fill="#f39c12" font-size="7">REF</text>
+  <line x1="580" y1="220" x2="580" y2="245" stroke="#2ecc71" stroke-width="1.5" stroke-dasharray="3,2"/>
+  <line x1="580" y1="210" x2="568" y2="224" stroke="#9b59b6" stroke-width="2"/>
+  <text x="563" y="210" fill="#4d96ff" font-size="11" font-weight="bold">D0</text>
+  <text x="561" y="222" fill="#9b59b6" font-size="9">SW</text>
+  <line x1="580" y1="245" x2="580" y2="265" stroke="#2ecc71" stroke-width="1.5"/>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- GND RAIL horizontal -->
+  <line x1="140" y1="265" x2="660" y2="265" stroke="#2ecc71" stroke-width="2"/>
+
+  <!-- GND symbols on rail -->
+  <line x1="160" y1="265" x2="160" y2="275" stroke="#2ecc71" stroke-width="1.5"/>
+  <line x1="148" y1="275" x2="172" y2="275" stroke="#2ecc71" stroke-width="2"/>
+  <line x1="152" y1="280" x2="168" y2="280" stroke="#2ecc71" stroke-width="1.5"/>
+  <line x1="156" y1="285" x2="164" y2="285" stroke="#2ecc71" stroke-width="1"/>
+
+  <!-- GND label -->
+  <text x="52" y="270" fill="#2ecc71" font-size="11" font-weight="bold">GND</text>
+  <line x1="85" y1="265" x2="140" y2="265" stroke="#2ecc71" stroke-width="2"/>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- NODE DOTS on main rail -->
+  <circle cx="160" cy="120" r="4" fill="#ffffff"/>
+  <circle cx="300" cy="120" r="4" fill="#ffffff"/>
+  <circle cx="440" cy="120" r="4" fill="#ffffff"/>
+  <circle cx="580" cy="120" r="4" fill="#ffffff"/>
+  <circle cx="660" cy="120" r="4" fill="#ff6b35"/>
+
+  <!-- Node labels -->
+  <text x="155" y="96" fill="#a8c0d6" font-size="9">N3</text>
+  <text x="295" y="96" fill="#a8c0d6" font-size="9">N2</text>
+  <text x="435" y="96" fill="#a8c0d6" font-size="9">N1</text>
+  <text x="575" y="96" fill="#a8c0d6" font-size="9">N0</text>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- DIGITAL INPUT LINES (from bottom — FPGA/logic) -->
+  <text x="140" y="320" fill="#ff6b6b" font-size="10" font-weight="bold">D3 (MSB)</text>
+  <line x1="160" y1="310" x2="160" y2="330" stroke="#ff6b6b" stroke-width="1.5" stroke-dasharray="2,2"/>
+  <polygon points="160,330 155,322 165,322" fill="#ff6b6b"/>
+
+  <text x="280" y="320" fill="#ffd93d" font-size="10" font-weight="bold">D2</text>
+  <line x1="300" y1="310" x2="300" y2="330" stroke="#ffd93d" stroke-width="1.5" stroke-dasharray="2,2"/>
+  <polygon points="300,330 295,322 305,322" fill="#ffd93d"/>
+
+  <text x="420" y="320" fill="#6bcb77" font-size="10" font-weight="bold">D1</text>
+  <line x1="440" y1="310" x2="440" y2="330" stroke="#6bcb77" stroke-width="1.5" stroke-dasharray="2,2"/>
+  <polygon points="440,330 435,322 445,322" fill="#6bcb77"/>
+
+  <text x="556" y="320" fill="#4d96ff" font-size="10" font-weight="bold">D0 (LSB)</text>
+  <line x1="580" y1="310" x2="580" y2="330" stroke="#4d96ff" stroke-width="1.5" stroke-dasharray="2,2"/>
+  <polygon points="580,330 575,322 585,322" fill="#4d96ff"/>
+
+  <!-- FPGA block -->
+  <rect x="120" y="335" width="500" height="36" rx="4" fill="#1a2535" stroke="#2a3f55" stroke-width="1.5"/>
+  <text x="340" y="349" fill="#4a9eff" font-size="10" text-anchor="middle" font-weight="bold" letter-spacing="0.12em">FPGA / LOGIC DRIVER</text>
+  <text x="340" y="362" fill="#3a5068" font-size="9" text-anchor="middle">I²S deserializer → parallel bit outputs → switch control</text>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- OUTPUT BUFFER / OPAMP (shown as triangle) -->
+  <!-- Vout line goes to opamp at x=720 -->
+  <polygon points="720,100 720,140 755,120" fill="none" stroke="#ff6b35" stroke-width="2"/>
+  <text x="724" y="116" fill="#ff6b35" font-size="9">+</text>
+  <text x="724" y="130" fill="#ff6b35" font-size="9">−</text>
+  <!-- feedback resistor Rf -->
+  <line x1="755" y1="120" x2="790" y2="120" stroke="#ff6b35" stroke-width="1.5"/>
+  <text x="764" y="115" fill="#ff6b35" font-size="9">Rf</text>
+  <!-- Non-inverting input from ladder -->
+  <line x1="700" y1="110" x2="720" y2="110" stroke="#ff6b35" stroke-width="1.5"/>
+  <text x="790" y="116" fill="#ff6b35" font-size="10" font-weight="bold">→ LOAD</text>
+
+  <!-- opamp label -->
+  <text x="718" y="148" fill="#3a5068" font-size="8" text-anchor="middle">optional</text>
+  <text x="718" y="158" fill="#3a5068" font-size="8" text-anchor="middle">buffer</text>
+
+  <!-- bracket showing "MSB eliminates this" -->
+  <line x1="712" y1="86" x2="712" y2="170" stroke="#3a5068" stroke-width="1" stroke-dasharray="2,2"/>
+  <line x1="712" y1="86" x2="800" y2="86" stroke="#3a5068" stroke-width="1" stroke-dasharray="2,2"/>
+  <line x1="712" y1="170" x2="800" y2="170" stroke="#3a5068" stroke-width="1" stroke-dasharray="2,2"/>
+  <text x="715" y="80" fill="#3a5068" font-size="8">MSB: no buffer needed</text>
+  <text x="715" y="178" fill="#3a5068" font-size="8">(high-current ladder output)</text>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- TITLE ANNOTATIONS -->
+  <text x="410" y="24" fill="#1e2d3d" font-size="28" text-anchor="middle" font-weight="bold" opacity="0.15">R-2R</text>
+  <text x="410" y="44" fill="#4a9eff" font-size="12" text-anchor="middle" letter-spacing="0.2em">4-BIT R-2R LADDER DAC</text>
+  <text x="410" y="58" fill="#3a5068" font-size="9" text-anchor="middle">MSB = Most Significant Bit  ·  LSB = Least Significant Bit  ·  All shunt resistors = 2R  ·  All series resistors = R</text>
+
+</svg>
+</div>
+
+<div class="legend">
+  <div class="legend-item"><div class="legend-swatch" style="background:#c8a96e"></div>R / 2R resistors</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#4a9eff"></div>ladder network wire</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#f39c12"></div>V_REF</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#2ecc71"></div>GND rail</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#ff6b35"></div>V_OUT</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#9b59b6"></div>SPDT switches</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#ff6b6b"></div>D3 MSB</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#ffd93d"></div>D2</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#6bcb77"></div>D1</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#4d96ff"></div>D0 LSB</div>
+</div>
+
+<div class="eq-section">
+  <h2>// Transfer Function</h2>
+  <div class="eq-grid">
+    <div class="eq-box">
+      <div class="label">Output voltage (ideal)</div>
+      <div class="formula">
+        V_OUT = V_REF × (D / 2^N)<br><br>
+        D = D3×8 + D2×4 + D1×2 + D0×1<br>
+        N = 4 bits → range 0..15
+      </div>
+    </div>
+    <div class="eq-box">
+      <div class="label">Example codes</div>
+      <div class="formula">
+        1111 → V_REF × 15/16 = 0.9375 V_REF<br>
+        1000 → V_REF × 8/16  = 0.5000 V_REF<br>
+        0001 → V_REF × 1/16  = 0.0625 V_REF<br>
+        0000 → 0V
+      </div>
+    </div>
+    <div class="eq-box">
+      <div class="label">Thevenin output impedance</div>
+      <div class="formula">
+        Z_OUT = R  (code-independent)<br><br>
+        ← This is the key property.<br>
+        Constant regardless of D code.
+      </div>
+    </div>
+    <div class="eq-box">
+      <div class="label">MSB high-current trick</div>
+      <div class="formula">
+        Use low R values (e.g. 100Ω/200Ω)<br>
+        + high V_REF (12–24V)<br>
+        → large I_OUT, no buffer needed<br>
+        + parallel N modules: Z_OUT / N
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="note">
+  <span>Switch operation:</span> each SPDT connects the 2R shunt resistor either to V_REF (bit=1) or GND (bit=0).
+  The Thevenin equivalent seen at V_OUT is always R regardless of the code word —
+  this is the fundamental property that makes R-2R work. In MSB's implementation the switches
+  are replaced by current-steering differential pairs (bipolar or FET), keeping the current
+  source always active and only changing its destination — eliminating switching glitches at the output.
+</div>
+
+</body>
+</html>
