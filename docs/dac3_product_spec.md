@@ -305,6 +305,62 @@ Fallback (simple pin header, adequate for testbed-only use):
 
 **Action required:** Research MSB connector type from available photos/teardowns before committing to PCB footprint. See open items.
 
+### 7.7 Output-Referred Kelvin Calibration (Invention — Wayne)
+
+#### Background
+
+In a sign-magnitude R-2R DAC with discrete MOSFET switches, the positive and negative half-cycles of the output waveform are governed by Vref+ and Vref− respectively. Any asymmetry between these rails — whether from LDO trim error, ladder resistor mismatch, switch Ron variation, or connector resistance — produces a gain difference between the two half-cycles. In single-ended mode this appears as second harmonic distortion; in balanced mode it is partially but not fully rejected by the downstream differential receiver.
+
+The naive correction — measuring Vref+ and Vref− directly and applying a digital scale factor from the ratio — is problematic for two reasons: measuring a negative rail with an FPGA ADC requires additional level-shifting hardware; and more fundamentally, it captures only one of many asymmetry sources.
+
+#### The Invention
+
+Rather than measuring the supply rails, calibration measures the **DAC output directly**, closing the correction loop around the entire analog signal chain. This is the classical Kelvin sensing principle applied at the system level: measure at the load, not at the source.
+
+#### Calibration Procedure
+
+At power-up, before audio playback begins:
+
+1. Output a code corresponding to (something like) +0.75 × FS on the positive half
+2. Output a code corresponding to (something like) −0.75 × FS on the negative half
+3. Feed both outputs into a difference amplifier
+4. Adjust the codes digitally — trimming one side toward the other — until the difference amplifier output is nulled to zero
+5. The code delta required to achieve null is the correction factor
+6. Store the correction factor as a digital scale factor in the FPGA
+7. Apply the scale factor as a multiply to all subsequent output codes during playback
+
+The 0.75 × FS operating point avoids ladder endpoint nonlinearity while keeping the signal large enough for reliable null detection.
+
+#### Key Properties
+
+The difference amplifier functions as a **null detector only** — not a precision measurement device. A null detector requires only sufficient resolution to determine the sign and approximate magnitude of the error, and short-term stability over the seconds during which calibration runs. It does not require calibrated absolute accuracy, low offset, or precision gain. Any competent op-amp satisfies the requirement.
+
+Because measurement is taken at the DAC output, **every source of positive/negative asymmetry in the entire analog chain is captured and corrected simultaneously**, including:
+
+- Vref+ / Vref− magnitude mismatch from LDO trim
+- Ladder resistor ratio errors
+- PMV16XN Ron variation between positive and negative switch banks
+- Switch threshold voltage spread
+- Connector and PCB trace resistance asymmetry
+
+None of these sources need to be identified or measured individually. The correction is total and automatic.
+
+#### Hardware Cost
+
+Zero additional connector pins are required — the DAC analog output is already present on the analog connector. The only additional hardware is a single difference amplifier: a simple dual op-amp on the motherboard, shared across all modules, not in the audio signal path during normal playback.
+
+#### Thermal Considerations
+
+Calibration is performed at power-up and repeated at intervals during thermal warm-up. The FPGA monitors successive calibration results and locks the scale factor when the delta between iterations falls below a threshold, indicating thermal equilibrium. This ensures the correction reflects operating temperature rather than cold-start conditions.
+
+#### Comparison with Prior Art
+
+Standard R-2R DAC implementations (Denafrips, Soekris) apply no asymmetry correction of this type. Supply-rail measurement approaches require bipolar ADC capability and correct only one of many asymmetry sources. The output-referred approach as described here — using the DAC itself as the measurement instrument, with a null detector as the only additional hardware, correcting all asymmetry sources simultaneously — has not been previously encountered in the published DIY or commercial DAC literature. MSB Technology is hypothesised to implement a similar approach given the architectural sophistication of their calibration system, but this has not been confirmed.
+
+**Applicability:** Final product architecture (discrete MOSFET switches). Not applicable to the testbed (74HC595, no independent gate/Vref domain separation), but the design and firmware can be stubbed in the testbed FPGA for later activation.
+
+**Status:** Independently invented by Wayne during DAC3/final product architecture design.
+
 ---
 
 ## 8. Analog Output Section
