@@ -193,9 +193,9 @@ Applied immediately before truncation:
 
 ### 6.5 Truncation
 
-- 24-bit magnitude → 16-bit magnitude
+- 24-bit magnitude → 21-bit magnitude
 - Applied after dither addition
-- Result: 1-bit sign + 16-bit magnitude per channel
+- Result: 1-bit sign + 21-bit magnitude per channel
 
 ### 6.6 Zero Crossing Detection and Converter Routing
 
@@ -234,18 +234,19 @@ At any instant, only one converter per channel carries the audio signal; the com
 - Count per module: 2× (16-bit output total)
 - Data: 16-bit magnitude, MSB first
 - Latch: simultaneous on both SRs via independent LATCH signal from FPGA
+- Vcc = Vref = 4.0V (same as Soekris), this provides 1.4VRMS output at full scale because output voltage gets halved.  Absolute max = 6.5V for this part, typical voltage max = 3.6V.
 
 ### 7.3 R-2R Ladder
 
-- Topology: standard binary-weighted R-2R
-- R value: 150Ω (2R = 300Ω)
+- Topology: standard binary-weighted R-2R, implemented as 3 physical resistors of same value
+- R value: 499Ω (2R = 998Ω, 2x R series)
 - Resistor tolerance: 0.01% thin-film (required for 16-bit linearity)
-- Bits: 16 (15 magnitude + termination)
-- Resistor count per module: 31 (15× R + 16× 2R)
+- Bits: 21 (21 magnitude per converter)
+- Resistor count per module: 65 (21× R + 22× 2R)
 
-> **Note on scalability:** R=150Ω base supports future parallel module configurations: 2 modules parallel → effective R=75Ω (add 600Ω); 4 modules → R=37.5Ω (add 1200Ω). Native resistor progression: 150, 300, 600, 1200Ω — all standard E96 values.
+> **Note on scalability:** R=499Ω base supports future parallel module configurations: 2 modules parallel → effective R=124.75Ω; 4 modules → R=62.375Ω.
 
-> **Note on parts availability** 5/15/26 on JLCPCB site, 100 ohm and 200 ohm R available, parts are 0.02% / 10PPM/C / 0805 package; PTFR0805Q100RN9 and PTFR0805Q200RN9.  It was found that 0.01% parts were not available or prohibitive cost: $8 to $65 per part.  This is probably why Soekris started with 0.05% and there was discussion about going to 0.02% and a goal of 0.01% but I don't know if it was ever resolved.  In addition, these parts are available at Mouser: 708-RNCF0603TKW100R and 708-RNCF0603TKW200R 100 ohms / 200 ohms which are 0.01%, 2ppm, 0603 package, and $1.76 each in volume of 100.  
+> **Note on parts availability** 5/15/26 on JLCPCB site, 100 ohm and 200 ohm R available, parts are 0.02% / 10PPM/C / 0805 package; PTFR0805Q100RN9 and PTFR0805Q200RN9.  It was found that 0.01% parts were not available or prohibitive cost: $8 to $65 per part.  This is probably why Soekris started with 0.05% and there was discussion about going to 0.02% and a goal of 0.01% but I don't know if it was ever resolved.  In addition, these parts are available at Mouser: 708-RNCF0603TKW100R and 708-RNCF0603TKW200R 100 ohms / 200 ohms which are 0.01%, 2ppm, 0603 package, and $1.76 each in volume of 100.  Later we're finding even that supply is not reliable due to low quantities, and 499 ohms is available at Digikey.  For dac3, should buy qty. 300 of these which will provide spares.
 
 ### 7.4 R-2R Ladder Leg Trim (Invention — Wayne)
 

@@ -1,3 +1,4 @@
 # Excel / LibreOffice temporary files
 ~$*
 .~lock.*#
+parts/
