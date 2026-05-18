@@ -37,7 +37,7 @@ See attached block diagram (testbed_dac_block_diagram_v2).
 | FPGA platform | Digilent Cmod A7-35T | $99, Artix-7, 48-pin DIP, onboard SRAM, USB programming |
 | Converter resolution | 17-bit (16-bit magnitude + sign) | Exceeds CD quality by 1 bit with high def sources; adequate for architecture validation |
 | Converter switch | 74HC595 shift register | Simple, available, sufficient for testbed |
-| Reference voltage | ±2.5V | Standard audio level, compatible with R=150Ω ladder |
+| Reference voltage | ±4.0V | Matches Soekris; gives 1.4 VRMS full-scale output (Vref/2 through R-2R Thevenin) |
 | Ladder R value | 150Ω | Low enough for adequate output level; scalable (300/600/1200Ω future) |
 | Oversampling | 8× in FPGA | Pushes image to ~352kHz; allows simple passive analog filter |
 | Output filter | Passive 2nd order RC | No active components in signal path; DC coupled |
@@ -273,10 +273,10 @@ The correction is algebraically exact for any value of Ron. Trim resistors need 
 
 ### 7.5 Reference Voltage
 
-- Positive: +2.5V from LT3042 LDO (0.8 nV/√Hz)
-- Negative: −2.5V from LT3094 LDO (2 nV/√Hz)
-- Input to LDOs: ±5V from power supply
-- LDO dissipation: (5−2.5) × ~50mA = 125mW per device — no heatsink required
+- Positive: +4.0V from LT3042 LDO (0.8 nV/√Hz)
+- Negative: −4.0V from LT3094 LDO (2 nV/√Hz)
+- Input to LDOs: ±6V from power supply (2V headroom — comfortable margin for LT3042/LT3094 min dropout ~0.3V)
+- LDO dissipation: (6−4.0) × ~50mA = 100mW per device — no heatsink required
 - All four converter modules share one Vref rail pair — noise is correlated, not averaged (acceptable for testbed)
 
 > **Critical architectural note:** 74HC595 VCC is powered from the **digital supply**, NOT from Vref. This separates the digital switching domain from the Vref domain. This is the same architectural separation that gives MSB its performance advantage over Denafrips (which powers 74LV595 from Vref, injecting ~400mA switching transients onto the reference).
@@ -384,7 +384,7 @@ For each bit N from MSB downward to the measurement floor:
 
 #### Stopping Criterion
 
-The procedure is applied from the MSB downward and stops when the bit weight contribution to the output approaches the reliable resolution floor of the difference amplifier. With an OPA2188 (5µV max input offset) and a 2.5V full-scale reference, the op-amp can reliably resolve differences down to approximately 2ppm of full scale. The RNCF0603TKY499R resistors at 0.01% tolerance represent 100ppm matching error — giving approximately 50× margin between the resistor error and the op-amp floor across most of the bit range. Below the point where the correction step size approaches the op-amp floor, the resistors are already more accurate than the measurement instrument, and applying a correction would inject noise rather than remove error. The algorithm detects this condition and stops.
+The procedure is applied from the MSB downward and stops when the bit weight contribution to the output approaches the reliable resolution floor of the difference amplifier. With an OPA2188 (5µV max input offset) and a 4.0V full-scale reference, the op-amp can reliably resolve differences down to approximately 1.25ppm of full scale. The RNCF0603TKY499R resistors at 0.01% tolerance represent 100ppm matching error — giving approximately 50× margin between the resistor error and the op-amp floor across most of the bit range. Below the point where the correction step size approaches the op-amp floor, the resistors are already more accurate than the measurement instrument, and applying a correction would inject noise rather than remove error. The algorithm detects this condition and stops.
 
 #### What Is Being Corrected
 
@@ -419,7 +419,8 @@ Passive 2nd order RC, one per channel (L and R — not per converter):
 - Filter pole: ~100 kHz
 - Attenuation at 352 kHz (8× image): ~−22 dB (2nd order) — adequate given 8× oversampling
 - DC coupled throughout — no capacitor in signal path
-- Full scale output: ~1.25V peak into high-impedance load
+- Full scale output: ~2.0V peak (1.4 VRMS) into high-impedance load
+- CD Red Book standard output: 2.0 VRMS — this design is approximately 3 dB shy; acceptable for the testbed given the high-impedance tube preamplifier load, but worth noting for the final product
 
 ### 8.2 Mute Relay
 
@@ -453,10 +454,10 @@ Self-contained internal power supply. No external wall adapter.
 | Rail | Voltage | Load | Purpose |
 |---|---|---|---|
 | +5V digital | +5V | Cmod A7, logic ICs | FPGA and digital logic |
-| +Vref | +2.5V (LT3042) | R-2R ladders | Positive reference |
-| −Vref | −2.5V (LT3094) | R-2R ladders | Negative reference |
-| +5V analog input | +5V to LT3042 | LDO input | Regulated by LT3042 |
-| −5V analog input | −5V to LT3094 | LDO input | Regulated by LT3094 |
+| +Vref | +4.0V (LT3042) | R-2R ladders | Positive reference |
+| −Vref | −4.0V (LT3094) | R-2R ladders | Negative reference |
+| +6V analog input | +6V to LT3042 | LDO input | Regulated by LT3042 |
+| −6V analog input | −6V to LT3094 | LDO input | Regulated by LT3094 |
 
 ### 9.3 Mains Input
 
@@ -468,7 +469,7 @@ Self-contained internal power supply. No external wall adapter.
 - FPGA (Cmod A7): ~500mW typical
 - Converter logic (4× 74HC595 pairs): ~200mW
 - R-2R ladder (4 converters): ~130mW
-- LT3042/LT3094 LDO dissipation: ~250mW
+- LT3042/LT3094 LDO dissipation: ~200mW (2× 100mW)
 - **Total: ~1.1W** — very low dissipation, small transformer adequate
 
 ---
